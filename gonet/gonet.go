@@ -10,13 +10,12 @@ import (
 
 // Base struct for ANN layer
 type Layer struct {
-	Neurons     uint
-	Weigths     [][]float64
-	Activation  func(*[][]float64, *[][]float64)
-	DActivation func(*[][]float64, *[][]float64)
-	Delta       [][]float64
-	Net         [][]float64
-	Output      [][]float64
+	Neurons    uint
+	Weigths    [][]float64
+	Activation *Activation
+	Delta      [][]float64
+	Net        [][]float64
+	Output     [][]float64
 }
 
 // Base struct for ANN model
@@ -28,9 +27,70 @@ type Model struct {
 
 // Base struct for Optimizer
 type Optimizer struct {
-	Loss func(*[][]float64, *[][]float64) [][]float64
+	Loss *Loss
 	// TODO: Eta could be a function made in a closure returning a variable learning rate
 	Eta float64
+}
+
+// Base struct for activation function
+type Activation struct {
+	Activ    func(*[][]float64, *[][]float64)
+	ActivDer func(*[][]float64, *[][]float64)
+}
+
+// Base struct for loss function
+type Loss struct {
+	Loss    func(*[][]float64, *[][]float64)
+	LossDer func(*[][]float64, *[][]float64)
+}
+
+// Initializes a model
+func (model *Model) Init(input uint) {
+	model.Input = input
+}
+
+// Initializes a layer
+func (layer *Layer) Init(neurons uint, activation string) {
+	// Initialize the net vector (output before activtion function)
+	layer.Net = initZero(neurons, 1)
+	// Initialize the output vector
+	layer.Output = initZero(neurons, 1)
+	// Initialize the delta vector  TODO: DO WE REALLY NEED TO STORE THAT ONE?
+	layer.Delta = initZero(neurons, 1)
+	// Initialize number of neurons
+	layer.Neurons = neurons
+	// Initialize activation function
+	layer.Activation = new(Activation)
+	layer.Activation.Init(activation)
+}
+
+// Initilizes an optimizer
+func (optimizer *Optimizer) Init(loss string, eta float64) {
+	optimizer.Eta = eta
+	optimizer.Loss = new(Loss)
+	optimizer.Loss.Init(loss)
+}
+
+// Initializes an activation function including its derivative
+func (activ *Activation) Init(activation string) {
+	switch activation {
+	case "tanh":
+		activ.Activ = Tanh
+		activ.ActivDer = DTanh
+	case "step":
+		activ.Activ = Step
+		// Room for more
+	}
+}
+
+// Initializes an activation function including its derivative
+func (loss *Loss) Init(loss_func string) {
+	switch loss_func {
+	case "mse":
+		loss.Loss = Tanh
+		loss.LossDer = DTanh
+		// Room for more
+	}
 }
 
 // Adds a layer to a model
@@ -45,19 +105,17 @@ func (model *Model) Add(layer *Layer) {
 		// Get the output size of the previous layer
 		layer.Weigths = initRand(layer.Neurons, model.Layers[len(model.Layers)-1].Neurons+1)
 	}
-	// Initialize the net vector (output before activtion function)
-	layer.Net = initZero(layer.Neurons, 1)
-	// Initialize the output vector
-	layer.Output = initZero(layer.Neurons, 1)
-	// Initialize the delta vector
-	layer.Delta = initZero(layer.Neurons, 1)
 	// Append the new layer to the slice of layers in model
 	model.Layers = append(model.Layers, layer)
 }
 
+// Adds an optimizer to the model
+func (model *Model) Compile(optimizer *Optimizer) {
+	model.Optimizer = optimizer
+}
+
 // Performs a forward step with one input sample
 func (model *Model) Forward(input [][]float64) error {
-	//fmt.Println("FORWARD")
 	if len(input) != int(model.Input) {
 		err1 := fmt.Errorf("Input of wrong size %d. Must be %d.", len(input), int(model.Input))
 		return err1
@@ -84,7 +142,7 @@ func (model *Model) Forward(input [][]float64) error {
 			return err2
 		}
 		//fmt.Println("Layer Net", l.Net)
-		l.Activation(&l.Net, &l.Output)
+		l.Activation.Activ(&l.Net, &l.Output)
 		//fmt.Println("Layer Output", l.Output)
 	}
 	return nil
@@ -117,7 +175,7 @@ func (model *Model) Backward(input [][]float64, target [][]float64) {
 				fmt.Println(err)
 				return
 			}
-			model.Layers[i].DActivation(&model.Layers[i].Net, &activationDer)
+			model.Layers[i].Activation.ActivDer(&model.Layers[i].Net, &activationDer)
 
 			var err2 error
 			model.Layers[i].Delta, err2 = elementMult(&model.Layers[i].Delta, &activationDer)

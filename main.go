@@ -12,30 +12,25 @@ func main() {
 	rand.Seed(42)
 	// Build the model
 	model := new(gonet.Model)
-	model.Input = 2
+	model.Init(2)
 	// Add the first layer
 	layer1 := new(gonet.Layer)
-	layer1.Neurons = 3
-	layer1.Activation = gonet.Tanh
-	layer1.DActivation = gonet.DTanh
+	layer1.Init(3, "tanh")
 	model.Add(layer1)
 	// Add the first layer
 	layer2 := new(gonet.Layer)
-	layer2.Neurons = 4
-	layer2.Activation = gonet.Tanh
-	layer2.DActivation = gonet.DTanh
+	layer2.Init(4, "tanh")
 	model.Add(layer2)
 	// Add final layer
 	layer3 := new(gonet.Layer)
-	layer3.Neurons = 1
-	layer3.Activation = gonet.Step
+	layer3.Init(1, "step")
 	model.Add(layer3)
 
 	// Add an optimizer
 	sgd := new(gonet.Optimizer)
-	sgd.Eta = 0.05
-	sgd.Loss = gonet.MSE
-	model.Optimizer = sgd
+	sgd.Init("mse", 0.05)
+
+	model.Compile(sgd)
 
 	// Sample input
 	in := [][]float64{
@@ -65,12 +60,12 @@ func main() {
 
 			model.Forward(sample)
 
-			fmt.Println("Target", t[i])
-			fmt.Println("Model Output:", model.Layers[len(model.Layers)-1].Output)
+			// fmt.Println("Target", t[i])
+			// fmt.Println("Model Output:", model.Layers[len(model.Layers)-1].Output)
 			loss += gonet.MSE(&model.Layers[len(model.Layers)-1].Output, &sample_target)[0][0]
 			model.Backward(sample, sample_target)
 		}
-		fmt.Printf("Loss Epoch %d: %f", epoch, loss)
+		fmt.Printf("Loss Epoch %d: %f", epoch, loss/float64(len(in)))
 
 	}
 	model.Forward(in)
