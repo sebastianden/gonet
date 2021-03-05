@@ -49,6 +49,7 @@ func main() {
 	// Sample target
 	t := []float64{1, -1, 1, -1, -1, 1, 1, -1, -1, 1}
 
+	// TODO Make this into a train function
 	for epoch := 0; epoch < 100; epoch++ {
 		fmt.Println("\nEpoch", epoch)
 		loss := 0.0

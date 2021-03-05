@@ -40,8 +40,8 @@ type Activation struct {
 
 // Base struct for loss function
 type Loss struct {
-	Loss    func(*[][]float64, *[][]float64)
-	LossDer func(*[][]float64, *[][]float64)
+	Loss    func(*[][]float64, *[][]float64) [][]float64
+	LossDer func(*[][]float64, *[][]float64, *[][]float64)
 }
 
 // Initializes a model
@@ -64,7 +64,7 @@ func (layer *Layer) Init(neurons uint, activation string) {
 	layer.Activation.Init(activation)
 }
 
-// Initilizes an optimizer
+// Initializes an optimizer
 func (optimizer *Optimizer) Init(loss string, eta float64) {
 	optimizer.Eta = eta
 	optimizer.Loss = new(Loss)
@@ -75,8 +75,8 @@ func (optimizer *Optimizer) Init(loss string, eta float64) {
 func (activ *Activation) Init(activation string) {
 	switch activation {
 	case "tanh":
-		activ.Activ = Tanh
-		activ.ActivDer = DTanh
+		activ.Activ = tanh
+		activ.ActivDer = dTanh
 	case "step":
 		activ.Activ = Step
 		// Room for more
@@ -87,8 +87,8 @@ func (activ *Activation) Init(activation string) {
 func (loss *Loss) Init(loss_func string) {
 	switch loss_func {
 	case "mse":
-		loss.Loss = Tanh
-		loss.LossDer = DTanh
+		loss.Loss = mse
+		loss.LossDer = dMse
 		// Room for more
 	}
 }
@@ -128,10 +128,7 @@ func (model *Model) Forward(input [][]float64) error {
 		} else {
 			layerInput = model.Layers[i-1].Output
 		}
-		inputBias := make([][]float64, len(layerInput))
-		for i := range inputBias {
-			inputBias[i] = make([]float64, len(layerInput[0]))
-		}
+		inputBias := initZero(uint(len(layerInput)), uint(len(layerInput[0])))
 		copy(inputBias, layerInput)
 		inputBias = append(inputBias, []float64{1.0})
 		//fmt.Println("Layer Input", inputBias)
@@ -150,19 +147,16 @@ func (model *Model) Forward(input [][]float64) error {
 
 // Performs a backpropagation step
 // TODO needs error handling
-func (model *Model) Backward(input [][]float64, target [][]float64) {
-	//fmt.Println("BACKWARD")
+func (model *Model) Backward(input [][]float64, target [][]float64) error {
 	// Traverse the layers backwards
 	for i := len(model.Layers) - 1; i >= 0; i-- {
 		// Calculate the error signal delta
 		// If it's the last layer use the loss function to calculate error
 		// else use error of anterior layer
 		if i == len(model.Layers)-1 {
-			// TODO this should be part of the Optimizer
-			DMSE(&model.Layers[i].Output, &target, &model.Layers[i].Delta)
+			model.Optimizer.Loss.LossDer(&model.Layers[i].Output, &target, &model.Layers[i].Delta)
 			//fmt.Println("Delta New:", model.Layers[i].Delta)
 		} else {
-			// THIS COULD BE A PROBLEM and is stupid
 			activationDer := initZero(uint(len(model.Layers[i].Net)), uint(len(model.Layers[i].Net[0])))
 			//fmt.Println("Weights:", model.Layers[i+1].Weigths)
 			// Transpose the weight matrix and remove the bias weights
@@ -172,8 +166,7 @@ func (model *Model) Backward(input [][]float64, target [][]float64) {
 			var err error
 			model.Layers[i].Delta, err = matMult(&wTnoBias, &model.Layers[i+1].Delta)
 			if err != nil {
-				fmt.Println(err)
-				return
+				return err
 			}
 			model.Layers[i].Activation.ActivDer(&model.Layers[i].Net, &activationDer)
 
@@ -181,7 +174,7 @@ func (model *Model) Backward(input [][]float64, target [][]float64) {
 			model.Layers[i].Delta, err2 = elementMult(&model.Layers[i].Delta, &activationDer)
 			if err2 != nil {
 				fmt.Println(err2)
-				return
+				return err
 			}
 
 		}
@@ -198,12 +191,12 @@ func (model *Model) Backward(input [][]float64, target [][]float64) {
 
 		deltaW, err := matMult(&model.Layers[i].Delta, &inputBias)
 		if err != nil {
-			fmt.Print(err)
-			return
+			return err
 		}
 		// Perform weight update
 		weightUpdate(&model.Layers[i].Weigths, &deltaW, &model.Optimizer.Eta)
 	}
+	return nil
 }
 
 // Initialize a matrix with values from -0.5 to 0.5
@@ -229,7 +222,7 @@ func initZero(n uint, m uint) [][]float64 {
 }
 
 // Hyperbolic tangent activation function
-func Tanh(mat *[][]float64, out *[][]float64) {
+func tanh(mat *[][]float64, out *[][]float64) {
 	n := len(*mat)
 	m := len((*mat)[0])
 
@@ -241,7 +234,7 @@ func Tanh(mat *[][]float64, out *[][]float64) {
 }
 
 // Derivative of hyperbolic tangent activation function
-func DTanh(mat *[][]float64, out *[][]float64) {
+func dTanh(mat *[][]float64, out *[][]float64) {
 	n := len(*mat)
 	m := len((*mat)[0])
 
@@ -341,7 +334,7 @@ func elementMult(A *[][]float64, B *[][]float64) ([][]float64, error) {
 }
 
 // Mean Squared Error Loss function
-func MSE(output *[][]float64, target *[][]float64) [][]float64 {
+func mse(output *[][]float64, target *[][]float64) [][]float64 {
 	n := len(*output)
 	m := len((*output)[0])
 
@@ -356,7 +349,7 @@ func MSE(output *[][]float64, target *[][]float64) [][]float64 {
 }
 
 // Derivative of Mean Squared Error Loss function
-func DMSE(output *[][]float64, target *[][]float64, delta *[][]float64) {
+func dMse(output *[][]float64, target *[][]float64, delta *[][]float64) {
 	n := len(*output)
 	m := len((*output)[0])
 
