@@ -190,8 +190,6 @@ func (model *Model) backward(input [][]float64, target [][]float64) error {
 // Function for training a model
 // TODO Missing the whole batch part
 func (model *Model) Fit(in [][]float64, t [][]float64, epochs uint) {
-	fmt.Println(in)
-	fmt.Println(t)
 	for epoch := 0; epoch < int(epochs); epoch++ {
 		fmt.Println("\nEpoch", epoch)
 		loss := 0.0
