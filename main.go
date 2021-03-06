@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 
 	"./gonet"
@@ -27,10 +26,7 @@ func main() {
 	model.Add(layer3)
 
 	// Add an optimizer
-	sgd := new(gonet.Optimizer)
-	sgd.Init("mse", 0.05)
-
-	model.Compile(sgd)
+	model.Compile("mse", "sgd", 0.05)
 
 	// Sample input
 	in := [][]float64{
@@ -49,25 +45,6 @@ func main() {
 	// Sample target
 	t := []float64{1, -1, 1, -1, -1, 1, 1, -1, -1, 1}
 
-	// TODO Make this into a train function
-	for epoch := 0; epoch < 100; epoch++ {
-		fmt.Println("\nEpoch", epoch)
-		loss := 0.0
-		for i := 0; i < len(in); i++ {
+	model.Fit(in, t, 100)
 
-			sample := [][]float64{in[i]}
-			sample = gonet.Transpose(&sample)
-			sample_target := [][]float64{{t[i]}}
-
-			model.Forward(sample)
-
-			// fmt.Println("Target", t[i])
-			// fmt.Println("Model Output:", model.Layers[len(model.Layers)-1].Output)
-			loss += gonet.MSE(&model.Layers[len(model.Layers)-1].Output, &sample_target)[0][0]
-			model.Backward(sample, sample_target)
-		}
-		fmt.Printf("Loss Epoch %d: %f", epoch, loss/float64(len(in)))
-
-	}
-	model.Forward(in)
 }

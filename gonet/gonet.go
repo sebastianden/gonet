@@ -22,20 +22,14 @@ type Layer struct {
 type Model struct {
 	Input     uint
 	Layers    []*Layer
+	Loss      *Loss
 	Optimizer *Optimizer
 }
 
 // Base struct for Optimizer
 type Optimizer struct {
-	Loss *Loss
 	// TODO: Eta could be a function made in a closure returning a variable learning rate
 	Eta float64
-}
-
-// Base struct for activation function
-type Activation struct {
-	Activ    func(*[][]float64, *[][]float64)
-	ActivDer func(*[][]float64, *[][]float64)
 }
 
 // Base struct for loss function
@@ -55,7 +49,7 @@ func (layer *Layer) Init(neurons uint, activation string) {
 	layer.Net = initZero(neurons, 1)
 	// Initialize the output vector
 	layer.Output = initZero(neurons, 1)
-	// Initialize the delta vector  TODO: DO WE REALLY NEED TO STORE THAT ONE?
+	// Initialize the delta vector
 	layer.Delta = initZero(neurons, 1)
 	// Initialize number of neurons
 	layer.Neurons = neurons
@@ -65,20 +59,10 @@ func (layer *Layer) Init(neurons uint, activation string) {
 }
 
 // Initializes an optimizer
-func (optimizer *Optimizer) Init(loss string, eta float64) {
-	optimizer.Eta = eta
-	optimizer.Loss = new(Loss)
-	optimizer.Loss.Init(loss)
-}
-
-// Initializes an activation function including its derivative
-func (activ *Activation) Init(activation string) {
-	switch activation {
-	case "tanh":
-		activ.Activ = tanh
-		activ.ActivDer = dTanh
-	case "step":
-		activ.Activ = Step
+func (optimizer *Optimizer) Init(opt string, eta float64) {
+	switch opt {
+	case "sgd":
+		optimizer.Eta = eta
 		// Room for more
 	}
 }
@@ -110,12 +94,15 @@ func (model *Model) Add(layer *Layer) {
 }
 
 // Adds an optimizer to the model
-func (model *Model) Compile(optimizer *Optimizer) {
-	model.Optimizer = optimizer
+func (model *Model) Compile(loss string, optimizer string, eta float64) {
+	model.Loss = new(Loss)
+	model.Loss.Init(loss)
+	model.Optimizer = new(Optimizer)
+	model.Optimizer.Init(optimizer, eta)
 }
 
 // Performs a forward step with one input sample
-func (model *Model) Forward(input [][]float64) error {
+func (model *Model) forward(input [][]float64) error {
 	if len(input) != int(model.Input) {
 		err1 := fmt.Errorf("Input of wrong size %d. Must be %d.", len(input), int(model.Input))
 		return err1
@@ -131,38 +118,36 @@ func (model *Model) Forward(input [][]float64) error {
 		inputBias := initZero(uint(len(layerInput)), uint(len(layerInput[0])))
 		copy(inputBias, layerInput)
 		inputBias = append(inputBias, []float64{1.0})
-		//fmt.Println("Layer Input", inputBias)
-		//fmt.Println("Layer Weigths", l.Weigths)
+		// net_j = w_ji * x_i
 		var err2 error
 		l.Net, err2 = matMult(&l.Weigths, &inputBias)
 		if err2 != nil {
 			return err2
 		}
-		//fmt.Println("Layer Net", l.Net)
+		// out_j = f(net_j)
 		l.Activation.Activ(&l.Net, &l.Output)
-		//fmt.Println("Layer Output", l.Output)
+
 	}
 	return nil
 }
 
 // Performs a backpropagation step
 // TODO needs error handling
-func (model *Model) Backward(input [][]float64, target [][]float64) error {
+func (model *Model) backward(input [][]float64, target [][]float64) error {
 	// Traverse the layers backwards
 	for i := len(model.Layers) - 1; i >= 0; i-- {
 		// Calculate the error signal delta
 		// If it's the last layer use the loss function to calculate error
 		// else use error of anterior layer
 		if i == len(model.Layers)-1 {
-			model.Optimizer.Loss.LossDer(&model.Layers[i].Output, &target, &model.Layers[i].Delta)
-			//fmt.Println("Delta New:", model.Layers[i].Delta)
+			// delta_out =
+			model.Loss.LossDer(&model.Layers[i].Output, &target, &model.Layers[i].Delta)
 		} else {
 			activationDer := initZero(uint(len(model.Layers[i].Net)), uint(len(model.Layers[i].Net[0])))
-			//fmt.Println("Weights:", model.Layers[i+1].Weigths)
 			// Transpose the weight matrix and remove the bias weights
-			wT := Transpose(&model.Layers[i+1].Weigths)
+			wT := transpose(&model.Layers[i+1].Weigths)
 			wTnoBias := wT[:len(wT)-1]
-
+			// Calculate error signals of current layer
 			var err error
 			model.Layers[i].Delta, err = matMult(&wTnoBias, &model.Layers[i+1].Delta)
 			if err != nil {
@@ -186,7 +171,7 @@ func (model *Model) Backward(input [][]float64, target [][]float64) error {
 			layerInput = model.Layers[i-1].Output
 		}
 		// Add bias to output of previous layer, Deep Copy needed there must be a better Way to do this
-		inputBias := Transpose(&layerInput)
+		inputBias := transpose(&layerInput)
 		inputBias[0] = append(inputBias[0], 1.0)
 
 		deltaW, err := matMult(&model.Layers[i].Delta, &inputBias)
@@ -197,6 +182,27 @@ func (model *Model) Backward(input [][]float64, target [][]float64) error {
 		weightUpdate(&model.Layers[i].Weigths, &deltaW, &model.Optimizer.Eta)
 	}
 	return nil
+}
+
+// Function for training a model
+// TODO Missing the whole batch part
+func (model *Model) Fit(in [][]float64, t []float64, epochs uint) {
+	for epoch := 0; epoch < int(epochs); epoch++ {
+		fmt.Println("\nEpoch", epoch)
+		loss := 0.0
+		for i := 0; i < len(in); i++ {
+
+			sample := [][]float64{in[i]}
+			sample = transpose(&sample)
+			sample_target := [][]float64{{t[i]}}
+
+			model.forward(sample)
+
+			loss += model.Loss.Loss(&model.Layers[len(model.Layers)-1].Output, &sample_target)[0][0]
+			model.backward(sample, sample_target)
+		}
+		fmt.Printf("Loss Epoch %d: %f", epoch, loss/float64(len(in)))
+	}
 }
 
 // Initialize a matrix with values from -0.5 to 0.5
@@ -221,46 +227,6 @@ func initZero(n uint, m uint) [][]float64 {
 	return mat
 }
 
-// Hyperbolic tangent activation function
-func tanh(mat *[][]float64, out *[][]float64) {
-	n := len(*mat)
-	m := len((*mat)[0])
-
-	for i := 0; i < n; i++ {
-		for j := 0; j < m; j++ {
-			(*out)[i][j] = math.Tanh((*mat)[i][j])
-		}
-	}
-}
-
-// Derivative of hyperbolic tangent activation function
-func dTanh(mat *[][]float64, out *[][]float64) {
-	n := len(*mat)
-	m := len((*mat)[0])
-
-	for i := 0; i < n; i++ {
-		for j := 0; j < m; j++ {
-			(*out)[i][j] = 1 - math.Pow(math.Tanh((*mat)[i][j]), 2)
-		}
-	}
-}
-
-// Step activation function
-func Step(mat *[][]float64, out *[][]float64) {
-	n := len(*mat)
-	m := len((*mat)[0])
-
-	for i := 0; i < n; i++ {
-		for j := 0; j < m; j++ {
-			if (*mat)[i][j] < 0 {
-				(*out)[i][j] = -1
-			} else if (*mat)[i][j] >= 0 {
-				(*out)[i][j] = 1
-			}
-		}
-	}
-}
-
 // Function for performing weight update
 func weightUpdate(w *[][]float64, deltaW *[][]float64, eta *float64) {
 	n := len(*w)
@@ -275,7 +241,6 @@ func weightUpdate(w *[][]float64, deltaW *[][]float64, eta *float64) {
 
 // Function for performing matrix multiplication
 func matMult(A *[][]float64, B *[][]float64) ([][]float64, error) {
-	// TODO this is also stupid the matrix is added to and never reset!
 	a := len((*A)[0])
 	b := len(*B)
 	if a != b {
@@ -298,7 +263,7 @@ func matMult(A *[][]float64, B *[][]float64) ([][]float64, error) {
 }
 
 // Transpose a Tensor
-func Transpose(A *[][]float64) [][]float64 {
+func transpose(A *[][]float64) [][]float64 {
 	n := len(*A)
 	m := len((*A)[0])
 
