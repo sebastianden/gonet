@@ -191,7 +191,7 @@ func (model *Model) backward(input [][]float64, target [][]float64) error {
 // TODO Missing the whole batch part
 func (model *Model) Fit(in [][]float64, t [][]float64, epochs uint) {
 	for epoch := 0; epoch < int(epochs); epoch++ {
-		fmt.Println("\nEpoch", epoch)
+		fmt.Println("Epoch", epoch)
 		loss := 0.0
 		for i := 0; i < len(in); i++ {
 
@@ -204,8 +204,22 @@ func (model *Model) Fit(in [][]float64, t [][]float64, epochs uint) {
 			loss += model.Loss.Loss(&model.Layers[len(model.Layers)-1].Output, &sample_target)[0][0]
 			model.backward(sample, sample_target)
 		}
-		fmt.Printf("Loss Epoch %d: %f", epoch, loss/float64(len(in)))
+		fmt.Printf("Loss Epoch %d: %f \n", epoch, loss/float64(len(in)))
 	}
+}
+
+func (model *Model) Predict(in [][]float64) [][]float64 {
+	yPred := make([][]float64, 0)
+	for i := 0; i < len(in); i++ {
+		sample := [][]float64{in[i]}
+		sample = transpose(&sample)
+
+		model.forward(sample)
+		res := make([]float64, 1)
+		copy(res, model.Layers[len(model.Layers)-1].Output[0])
+		yPred = append(yPred, res)
+	}
+	return yPred
 }
 
 // Initialize a matrix with values from -0.5 to 0.5

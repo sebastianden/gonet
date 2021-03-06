@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 
 	"./gonet"
@@ -14,7 +15,7 @@ func main() {
 	model.Init(2)
 	// Add the first layer
 	layer1 := new(gonet.Layer)
-	layer1.Init(10, "tanh")
+	layer1.Init(50, "tanh")
 	model.Add(layer1)
 	// Add the first layer
 	layer2 := new(gonet.Layer)
@@ -29,8 +30,16 @@ func main() {
 	model.Compile("mse", "sgd", 0.01)
 
 	// Import data
-	X, y := gonet.LoadData("data/data1000.csv")
+	X, y := gonet.LoadData("data/data100.csv")
 
-	model.Fit(X, y, 10000)
+	yPred := model.Predict(X)
+	fmt.Println(yPred)
+	fmt.Println(y)
+
+	model.Fit(X, y, 100)
+
+	yPred = model.Predict(X)
+	fmt.Println(yPred)
+	fmt.Println(y)
 
 }
