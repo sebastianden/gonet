@@ -1,9 +1,12 @@
 package gonet
 
 import (
+	"encoding/csv"
 	"fmt"
 	"math"
 	"math/rand"
+	"os"
+	"strconv"
 )
 
 // TODO: We need a Tensor type for [][]float64
@@ -186,7 +189,9 @@ func (model *Model) backward(input [][]float64, target [][]float64) error {
 
 // Function for training a model
 // TODO Missing the whole batch part
-func (model *Model) Fit(in [][]float64, t []float64, epochs uint) {
+func (model *Model) Fit(in [][]float64, t [][]float64, epochs uint) {
+	fmt.Println(in)
+	fmt.Println(t)
 	for epoch := 0; epoch < int(epochs); epoch++ {
 		fmt.Println("\nEpoch", epoch)
 		loss := 0.0
@@ -194,7 +199,7 @@ func (model *Model) Fit(in [][]float64, t []float64, epochs uint) {
 
 			sample := [][]float64{in[i]}
 			sample = transpose(&sample)
-			sample_target := [][]float64{{t[i]}}
+			sample_target := [][]float64{t[i]}
 
 			model.forward(sample)
 
@@ -323,4 +328,39 @@ func dMse(output *[][]float64, target *[][]float64, delta *[][]float64) {
 			(*delta)[i][j] = 2 * ((*target)[i][j] - (*output)[i][j])
 		}
 	}
+}
+
+// Function to load data from a csv file
+func LoadData(path string) ([][]float64, [][]float64) {
+	csvFile, err := os.Open(path)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer csvFile.Close()
+
+	csvLines, err := csv.NewReader(csvFile).ReadAll()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	X := make([][]float64, 0)
+	y := make([][]float64, 0)
+	for i := 0; i < len(csvLines); i++ {
+		sample := make([]float64, 0)
+		target := make([]float64, 0)
+		for j := 0; j < len(csvLines[0]); j++ {
+			s, err := strconv.ParseFloat(csvLines[i][j], 32)
+			if err != nil {
+				fmt.Println(err)
+			}
+			if j == len(csvLines[0])-1 {
+				target = append(target, s)
+			} else {
+				sample = append(sample, s)
+			}
+		}
+		X = append(X, sample)
+		y = append(y, target)
+	}
+	return X, y
 }
