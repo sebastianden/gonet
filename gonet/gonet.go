@@ -88,10 +88,10 @@ func (model *Model) Add(layer *Layer) {
 	if l == 0 {
 		// Initialize the weigths randomly
 		// TODO: Better initialization (e.g. Glorot)
-		layer.Weigths = initRand(layer.Neurons, model.Input+1)
+		layer.Weigths = initGlorot(layer.Neurons, model.Input+1)
 	} else {
 		// Get the output size of the previous layer
-		layer.Weigths = initRand(layer.Neurons, model.Layers[len(model.Layers)-1].Neurons+1)
+		layer.Weigths = initGlorot(layer.Neurons, model.Layers[len(model.Layers)-1].Neurons+1)
 	}
 	// Append the new layer to the slice of layers in model
 	model.Layers = append(model.Layers, layer)
@@ -221,6 +221,23 @@ func (model *Model) Predict(in [][]float64) [][]float64 {
 		yPred = append(yPred, res)
 	}
 	return yPred
+}
+
+// Initialize weigths in the Glorot scheme
+func initGlorot(n uint, m uint) [][]float64 {
+	variance := 2.0 / float64(n+m)
+	std := math.Sqrt(variance)
+
+	mat := make([][]float64, n)
+	for i := range mat {
+		row := make([]float64, m)
+		for j := range row {
+			row[j] = rand.NormFloat64() * std
+		}
+		mat[i] = row
+	}
+	return mat
+
 }
 
 // Initialize a matrix with values from -0.5 to 0.5
