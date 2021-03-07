@@ -17,6 +17,9 @@ func (activ *Activation) Init(activation string) {
 	case "relu":
 		activ.Activ = relu
 		activ.ActivDer = dRelu
+	case "sigmoid":
+		activ.Activ = sigmoid
+		activ.ActivDer = dSigmoid
 	case "step":
 		activ.Activ = step
 	case "linear":
@@ -73,6 +76,31 @@ func dRelu(mat *[][]float64, out *[][]float64) {
 			} else {
 				(*out)[i][j] = 0
 			}
+		}
+	}
+}
+
+// Sigmoid activation function
+func sigmoid(mat *[][]float64, out *[][]float64) {
+	n := len(*mat)
+	m := len((*mat)[0])
+
+	for i := 0; i < n; i++ {
+		for j := 0; j < m; j++ {
+			(*out)[i][j] = 1 / (1 + math.Exp(-(*mat)[i][j]))
+		}
+	}
+}
+
+// Derivative of sigmoid activation function
+func dSigmoid(mat *[][]float64, out *[][]float64) {
+	n := len(*mat)
+	m := len((*mat)[0])
+
+	for i := 0; i < n; i++ {
+		for j := 0; j < m; j++ {
+			sig := 1 / (1 + math.Exp(-(*mat)[i][j]))
+			(*out)[i][j] = sig * (1 - sig)
 		}
 	}
 }

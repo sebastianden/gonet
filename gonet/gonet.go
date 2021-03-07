@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"reflect"
 	"strconv"
 )
 
@@ -375,4 +376,15 @@ func LoadData(path string) ([][]float64, [][]float64) {
 		y = append(y, target)
 	}
 	return X, y
+}
+
+// Calculate accuracy of classification results
+func Accuracy(y [][]float64, yPred [][]float64) float64 {
+	acc := 0.0
+	for i := 0; i < len(y); i++ {
+		if reflect.DeepEqual(y[i], yPred[i]) {
+			acc += 1
+		}
+	}
+	return acc / float64(len(y))
 }
